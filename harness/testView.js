@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +28,11 @@ var createAnchor = function(text, id) {
   return anchor;
 };
 
-var createOption = function(text, value) {
+var createOption = function(text, value, isSelected = false) {
   var option = document.createElement('option');
   option.text = text;
   option.value = value;
+  isSelected && (option.selected = 'selected');
   return option;
 };
 
@@ -44,18 +46,14 @@ function TestView(testSuiteVer) {
   var testSuites = [];
   var links = [];
 
-  this.addSelector = function(text, optionTexts, values, callback) {
+  this.addSelector = function(text, optionTexts, id = null, defaultValue = 0) {
     optionTexts = optionTexts instanceof Array ? optionTexts : [optionTexts];
-    values = values instanceof Array ? values : [values];
-
-    if (optionTexts.length !== values.length)
-      throw "text length and value length don't match!";
 
     selectors.push({
       'text': text,
       'optionTexts': optionTexts,
-      'values': values,
-      'cb': callback
+      'id': id,
+      'defaultValue': defaultValue
     })
   };
 
@@ -103,7 +101,7 @@ function TestView(testSuiteVer) {
 
   this.generate = function() {
     var heading = '[' + this.testSuiteVer + '] ' +
-        testSuiteDescriptions[harnessConfig.testType].heading + ' (v REVISION)';
+        testSuiteDescriptions[harnessConfig.testType].heading;
     try {
       document.title = testSuiteDescriptions[harnessConfig.testType].title;
     } catch (e) {
@@ -112,6 +110,9 @@ function TestView(testSuiteVer) {
     document.body.appendChild(createElement('span', 'title', null, heading));
     document.body.appendChild(createElement('span', 'info', 'h4'));
     document.body.appendChild(createElement('span', 'usage', 'h4'));
+    var config = createElement('span', 'configure', 'h4')
+    config.innerHTML = "Configuration:" + window.ConfigString;
+    document.body.appendChild(config);
     document.body.appendChild(createElement('div', 'testview'));
 
     var div = document.getElementById(this.divId);
@@ -150,12 +151,17 @@ function TestView(testSuiteVer) {
     }
     for (var i = 0; i < selectors.length; ++i) {
       switchDiv.appendChild(document.createTextNode(selectors[i].text));
-      var select = document.createElement('select');
+      var select = document.createElement('span');
+      select.id = selectors[i].id;
       for (var j = 0; j < selectors[i].optionTexts.length; ++j) {
-        select.appendChild(createOption(selectors[i].optionTexts[j],
-            selectors[i].values[j]));
+        select.appendChild(createAnchor(selectors[i].optionTexts[j],selectors[i].optionTexts[j]));
+        select.lastChild.setAttribute('data-href', location.origin + "?test_type=" + harnessConfig.testType + "&engine_" + selectors[i].id + "=" + selectors[i].optionTexts[j]);
+        select.lastChild.onclick = window.navigate;
+        if (selectors[i].optionTexts[j] != selectors[i].defaultValue)
+            select.lastChild.classList.add('focusable');
+        else
+            select.lastChild.classList.add('bold');
       }
-      select.onchange = selectors[i].cb;
       switchDiv.appendChild(select);
     }
 

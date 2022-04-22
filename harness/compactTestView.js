@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,39 +35,29 @@ var compactTestView = (function() {
       if (harnessConfig.controlMediaFormatSelection) {
         this.addSwitch('WebM/VP9: ', 'enablewebm');
       }
+      this.addSwitch('Check frames: ', 'checkframes');
 
       this.addCommand('Run All', 'run-selected', 'Run all tests in order.',
         function(e) {
           if (self.onrunselected)
             self.onrunselected.call(self, e);
         });
-      // Begin non GitHub files
-      this.addCommand('Login', 'login', 'login to get user token.', function(e) {
-        util.login(() => {
-          if (document.getElementById('login-pop-up')) {
-            document.getElementById('login-pop-up').style.display = 'none';
-            util.uploadTestResult(() => { window.LOG(this, ['Login:', 'Successful']); });
-          }
-        });
-      });
-      this.addCommand('Submit', 'submit', 'submit test results.', function(e) {
-        util.uploadTestResult(() => { window.LOG(this, ['TestResult:', 'Sent']); });
-      });
-      //End non GitHub files
 
 
-      this.addLink('Links', 'links.html');
-      this.addLink('Instructions', 'instructions.html');
-      this.addLink('Changelog', 'changelog.html');
-      this.addLink('Download-Source', 'download.tar.gz');
-      this.addLink('Download-Media-files', 'YTS-media-files.tar.gz');
       if (harnessConfig.novp9) {
         this.addLink('No VP9', 'main.html');
       }
+      this.addLink('YouTube Tests', 'https://ytlr-cert.appspot.com/2021/main.html');
       this.addLink('Content Licenses', 'licenses.html');
-      this.addLink('YouTube', 'https://youtube.com/tv');
+      this.addLink('Media Coverage', 'coverage.html');
 
       this.addTestSuites(testSuiteVersions[this.testSuiteVer].testSuites);
+
+      for (var engineId in EngineVersions) {
+        var engine = EngineVersions[engineId];
+        var versions = Object.keys(engine.versions);
+        this.addSelector(engine.name + " version :", versions, engineId, engine.defaultVersion);
+      }
     };
 
     this.addTest = function(desc) {

@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +29,10 @@ var loadTests = function(testType) {
       testType.substring(testType.indexOf('-') + 1, testType.lastIndexOf('-'));
     return window['PlaybackperfTest'](subgroup)
   } else {
+
+    if ('tests' in window.testSuiteDescriptions[testType]) {
+      return window.testSuiteDescriptions[testType].tests();
+    }
     testName = util.MakeCapitalName(testName) + 'Test';
     return window[testName]();
   }
@@ -51,6 +56,7 @@ var parseParams = function(testSuiteConfig) {
       parseParam('stoponfailure', false));
   config.enablewebm = util.stringToBoolean(
       parseParam('enablewebm', testSuiteConfig.enablewebm));
+  config.checkframes = util.stringToBoolean(parseParam('checkframes', false));
   config.muted = util.stringToBoolean(parseParam('muted', false));
   config.novp9 = util.stringToBoolean(parseParam('novp9', false));
   config.tests = parseParam('tests');
@@ -143,7 +149,10 @@ var createLogger = function() {
       text += arguments[i].toString() + ' ';
 
     console.log(text);
-    output.innerHTML = text + '\n' + output.innerHTML;
+    const separator = output.innerHTML.length === 0 ? '' : '\n';
+    output.innerHTML = output.innerHTML + separator + text;
+    output.scrollTop = output.scrollHeight
+    return text;
   };
 };
 
@@ -196,7 +205,7 @@ window.startMseTest = function(testSuiteVer) {
   window.harnessConfig = parseParams(testSuiteVersion.config);
   window.harnessConfig.testSuite = testSuiteVer;
 
-  addTimestampHash();
+//  addTimestampHash();
 
   if (!testSuiteVersion.testSuites.indexOf(harnessConfig.testType) === -1) {
     alert('Cannot find test type ' + harnessConfig.testType);

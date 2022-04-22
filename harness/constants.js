@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,4 +18,4 @@
 
 'use strict';
 
-var testVersion = '2020';
+var testVersion = 'MVT';

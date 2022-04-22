@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,15 +110,18 @@ window.createTest = function (name, category = '', mandatory = true, id = '',
   var t = function() {};
   t.prototype = Object.create(TestBase);
   t.prototype.name = name;
+  t.prototype.logs = "";
   t.prototype.title = title;
   t.prototype.passingCriteria = passingCriteria;
   t.prototype.instruction = instruction;
   t.prototype.id = id;
   t.prototype.desc = name;
   t.prototype.running = false;
+  t.prototype.playing = false;
   t.prototype.passes = 0;
   t.prototype.failures = 0;
   t.prototype.timeouts = 0;
+  t.prototype.executionTime = 0;
   t.prototype.outcome = TestOutcome.UNKNOWN;
   t.prototype.category = category;
   t.prototype.mandatory = mandatory;
@@ -167,8 +171,11 @@ var TestExecutor = function(testSuite, testsMask, testSuiteVer) {
 
 TestExecutor.prototype.log = function() {
   var args = Array.prototype.slice.call(arguments, 0);
-  args.splice(0, 0, 'TestExecutor: ');
-  LOG.apply(this, args);
+  args.splice(0, 0, '[' + new Date().toISOString() + '] TestExecutor: ');
+  const text = LOG.apply(this, args);
+  if (this.testList[this.currentTestIdx] && this.testList[this.currentTestIdx].prototype.running) {
+    this.testList[this.currentTestIdx].prototype.logs += text + '\n';
+  }
 };
 
 TestExecutor.prototype.assert = function(cond, msg) {
@@ -289,17 +296,9 @@ TestExecutor.prototype.initialize = function() {
   document.getElementById('info').innerHTML = this.info;
   this.log('Media Source and Encrypted Media Conformance Tests ' +
            '(version REVISION)');
-
-  this.longestTimeRatio = -1;
-  this.longestTest = null;
 };
 
 TestExecutor.prototype.onfinished = function() {
-  if (this.longestTest && this.longestTimeRatio > 0) {
-    this.log('Longest test is ' + this.longestTest + ', it takes ' +
-             this.longestTimeRatio + ' of its timeout.');
-  }
-
   var keepRunning = (!harnessConfig.stoponfailure ||
       this.lastResult === 'pass') && harnessConfig.loop &&
       (this.testView.anySelected() || this.numOfTestToRun === 1);
@@ -318,14 +317,6 @@ TestExecutor.prototype.onfinished = function() {
            ': Failed with "' + test.prototype.lastError.message + '"');
       }
     }
-  }
-
-  this.log('[PLEASE VERIFY]Device Status: {HDR: ' + harnessConfig.support_hdr +
-      '}, {WebSpeech: ' + harnessConfig.support_webspeech + '}.');
-
-  if (document.URL.indexOf('appspot.com') >= 0 ||
-      document.URL.indexOf('googleapis.com') >= 0) {
-    this.sendTestReport(getTestResults());
   }
 };
 
@@ -369,12 +360,12 @@ TestExecutor.prototype.startNextTest = function() {
   this.currentTest = new this.testList[this.currentTestIdx];
   this.blockTestResults = false;
 
+  this.testList[this.currentTestIdx].prototype.running = true;
+
   this.log('Test ' + (this.currentTest.index + 1) + ':' +
            this.currentTest.desc + ' STARTED with timeout ' +
            this.currentTest.timeout);
   this.timeouts.setTimeout(this.timeout.bind(this), this.currentTest.timeout);
-
-  this.testList[this.currentTestIdx].prototype.running = true;
 
   this.updateStatus();
 
@@ -524,18 +515,10 @@ TestExecutor.prototype.timeout = function() {
 };
 
 TestExecutor.prototype.teardownCurrentTest = function(isTimeout, errorMsg) {
-  if (!isTimeout) {
-    var time = Date.now() - this.startTime;
-    var ratio = time / this.currentTest.timeout;
-    if (ratio >= this.longestTimeRatio) {
-      this.longestTimeRatio = ratio;
-      this.longestTest = this.currentTest.desc;
-      this.log('New longest test ' + this.currentTest.desc +
-               ' with timeout ' + this.currentTest.timeout + ' takes ' + time);
-    }
-  }
+  this.testList[this.currentTestIdx].prototype.executionTime = Date.now() - this.startTime;
 
   this.testList[this.currentTestIdx].prototype.running = false;
+  this.testList[this.currentTestIdx].prototype.playing = false;
   this.updateStatus();
 
   this.timeouts.clearAll();
@@ -557,41 +540,41 @@ TestExecutor.prototype.teardownCurrentTest = function(isTimeout, errorMsg) {
 window.TestBase = TestBase;
 window.TestExecutor = TestExecutor;
 
+function getTestStatus(test) {
+  if (test.prototype.outcome == TestOutcome.PASSED)
+    return "passed";
+  else if (test.prototype.outcome == TestOutcome.FAILED)
+    return "failed";
+  else
+    return "skipped";
+}
+
 window.getTestResults = function(testStartId, testEndId) {
   testStartId = testStartId || 0;
   testEndId = testEndId || window.globalRunner.testList.length;
 
   var results = {
-    pass: {},
-    fail: {}
+    "name": harnessConfig.testType,
+    "setup_log": "",
+    "suites": [],
+    "teardown_log": "",
+    "tests": [],
+    "type": "suite_result",
+    "ver": "1.0"
   };
-
-  for (var r in results) {
-    results[r][harnessConfig.testSuite] = {};
-    results[r][harnessConfig.testSuite][harnessConfig.testType] = {};
-  }
-
-  var passResults =
-      results.pass[harnessConfig.testSuite][harnessConfig.testType];
-  var failResults =
-      results.fail[harnessConfig.testSuite][harnessConfig.testType];
 
   for (var i = testStartId; i < testEndId; ++i) {
     if (window.globalRunner.testList[i]) {
       var test = window.globalRunner.testList[i];
-      var category = test.prototype.category;
-      var name = test.prototype.name;
-      if (test.prototype.failures > 0) {
-        if (!failResults[category]) {
-          failResults[category] = [];
-        }
-        failResults[category].push(name);
-      } else if (test.prototype.passes > 0) {
-        if (!passResults[category]) {
-          passResults[category] = [];
-        }
-        passResults[category].push(name);
-      }
+      results["tests"].push({
+        "log": test.prototype.logs,
+        "name": test.prototype.name,
+        "status": getTestStatus(test),
+        "suites_chain": "MVT_SUITE." + harnessConfig.testType,
+        "time_ms": test.prototype.executionTime,
+        "type": "test_result",
+        "ver": "1.0"
+      });
     }
   }
   return results;

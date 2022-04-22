@@ -1,6 +1,7 @@
 /**
  * @license
  * Copyright 2018 Google Inc. All rights reserved.
+ * Copyright 2022 Liberty Global B.V.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +49,15 @@ var TimeoutManager = function(logger) {
     var uid = window.setTimeout(
         function() { timeoutHandler(timer.id); }, timeout);
     timer.uid = uid;
+    return timer.id;
   };
+
+  this.clearTimeout = function(id) {
+    if (typeof(timers[id]) != 'undefined') {
+      window.clearTimeout(timers[id].uid);
+      delete timers[id];
+    }
+  }
 
   this.setInterval = function(func, timeout) {
     var interval = getUniqueItem(intervals);
